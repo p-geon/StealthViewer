@@ -24,5 +24,5 @@ RUN pip install -r requirements.txt -q
 RUN pip install lycon
 
 WORKDIR ${WORKDIR}
-ENTRYPOINT ["/bin/bash"]
-#ENTRYPOINT ["python3", "hello_world.py"]
+#ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["python3", "scripts/imgchain.py"]

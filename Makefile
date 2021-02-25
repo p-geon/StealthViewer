@@ -4,7 +4,7 @@ export PWD=`pwd`
 # --------------------------------------------------------
 # docker
 export DIR_CONTAINER=`pwd | sed 's,^\(.*/\)\?\([^/]*\),\2,'`
-export NAME_CONTAINER=hyperpigeon/stealthviewer
+export NAME_CONTAINER=hyperpigeon/imagechain
 export DIR_DOCKER=.
 export DOCKERFILE_NAME=Dockerfile
 export CONTAINER_ID=`docker ps --format {{.ID}}` #Get newest container name
