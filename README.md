@@ -1,4 +1,4 @@
-# StealthViewer
+# ImageChain
 
 Python Modules for Image Plotting
 
