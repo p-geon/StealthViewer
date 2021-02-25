@@ -136,9 +136,12 @@ class ImageChain:
 		imgcat(self.img, height=7)
 		return self
 
-	def hist(self) -> None:
+	def hist(self, dtype="int16") -> None:
 		plt.figure()
-		plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
+		if(dtype=="int16"):
+			plt.hist(img_as_ubyte(self.img.flatten(), bins=np.arange(65536+1))
+		else:
+			plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
 		plt.show()
 		return self
 
