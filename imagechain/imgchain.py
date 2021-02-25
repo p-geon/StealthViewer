@@ -9,8 +9,8 @@ from skimage import exposure, img_as_ubyte
 
 from imgcat import imgcat
 
-import matplotlib
-matplotlib.use('agg')
+#import matplotlib
+#matplotlib.use('agg')
 
 class ImageChain:
 	"""
@@ -19,6 +19,7 @@ class ImageChain:
 		crop: crop a image
 		clip: clip(truncate) value
 		norm: TBD
+		norm_zscore: TBD
 		scale: scale(shrink) a image
 		align: scale a image (to decided width)
 		(print)
@@ -62,6 +63,7 @@ class ImageChain:
 
 	def norm(self, method="0to255->0to1") -> None:
 		"""
+		TBD
 		val: type:
 			0~255: uint8
 			0~65535: uint16?
@@ -77,6 +79,10 @@ class ImageChain:
 			pass
 		else:
 			raise ValueError("invalid method")
+		return self
+
+	def norm_zscore(self) -> None:
+		"""TBD"""
 		return self
 
 	def scale(self, ratio: int) -> None:
@@ -120,7 +126,7 @@ class ImageChain:
 			)
 
 		ax = plt.axes(projection='3d')
-		ax.plot_surface(x, y, z, rstride=1, cstride=1,
+		ax.plot_surface(H, H, self.img, rstride=1, cstride=1,
 						cmap='viridis', edgecolor='none')
 		ax.set_title('3D Plotting')
 		return self
