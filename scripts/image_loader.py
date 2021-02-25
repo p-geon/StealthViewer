@@ -1,6 +1,3 @@
-import numpy as np
-from PIL import ImageStat, Image
-
 def check_img(func):
 	def wrapper(*args, **kwargs):
 		print('--image information-')
@@ -26,6 +23,3 @@ def main():
 	print('pixel mean:', stat.mean) # Mean of Pixel Values
 	print('pixel variance:', stat.var) #variance of all Pixels
 	print('pixel stddev:', stat.stddev) #standerd deviation
-
-if(__name__=="__main__"):
-	main()
