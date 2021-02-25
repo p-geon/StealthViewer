@@ -9,6 +9,10 @@ from skimage import exposure, img_as_ubyte
 
 from imgcat import imgcat
 
+# ---
+
+from type_conversion import int16_to_uint8, uint8_to_norm, norm_to_uint8
+
 #import matplotlib
 #matplotlib.use('agg')
 
@@ -47,13 +51,6 @@ class ImageChain:
 		return self
 
 	def crop(self, crop_size: "(height, width)", pos=["center", "left-top", "right-top", "left-bottom", "right-bottom"][0]) -> None:
-		"""
-		<center>:
-			□□□□
-			□■□□ => ■□
-			□□■□ => □■
-			□□□□
-		"""
 		H, W = self.__get_height(), self.__get_width()
 		cH, cW = crop_size
 
@@ -72,28 +69,15 @@ class ImageChain:
 		np.clip(self.img, a_min=0.0, a_max=1.0)
 		return self
 
-	def norm(self, method="0to255->0to1") -> "self":
-		"""
-		TBD
-		val: type:
-			0~255: uint8
-			0~65535: uint16?
-			-32768~32767: int16
-			0~1: float32/64 (normalized)
-			-1~1: float32/64 (normalized)
-		"""
-		if(method=="0to255->0to1"):
-			self.img = self.img.astype(np.float32)/255.0
-		elif(method=="0to255->-1to1"):
-			pass
-		elif(method=="0to1->0to255"):
-			pass
+	def norm(self, method) -> "self":
+		if(method=="int16_to_uint8"):
+			self.img = int16_to_uint8(self.img)
+		elif(method=="uint8_to_norm"):
+			self.img = uint8_to_norm(self.img)
+		elif(method=="norm_to_uint8"):
+			self.img = norm_to_uint8(self.img)
 		else:
 			raise ValueError("invalid method")
-		return self
-
-	def norm_zscore(self) -> "self":
-		"""TBD"""
 		return self
 
 	def scale(self, ratio: int) -> "self":
@@ -117,7 +101,6 @@ class ImageChain:
 		print(f"num_pixels\t| {self.__get_height()*self.__get_width()}")
 		print(f"dtype\t| {type(img)}")
 		print(f"dtype (one-pixel)\t| {type(img.flatten()[0])}")
-
 		return self
 
 	def show(self) -> "self":
@@ -137,7 +120,7 @@ class ImageChain:
 			)
 
 		ax = plt.axes(projection='3d')
-		ax.plot_surface(H, H, self.img, rstride=1, cstride=1,
+		ax.plot_surface(H, W, self.img, rstride=1, cstride=1,
 						cmap='viridis', edgecolor='none')
 		ax.set_title('3D Plotting')
 		return self
