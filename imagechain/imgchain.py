@@ -5,21 +5,31 @@ from PIL import ImageStat, Image
 import skimage
 from skimage import io
 from skimage.transform import resize
+from skimage import exposure, img_as_ubyte
 
 from imgcat import imgcat
+
+import matplotlib
+matplotlib.use('agg')
 
 class ImageChain:
 	"""
 	ImgObj:
-		crop
-		clip
-		norm
-		scale
-		align
-		show
-		iterm_show: show a image for iterm2
-		hist
-		get
+		(transform)
+		crop: crop a image
+		clip: clip(truncate) value
+		norm: TBD
+		scale: scale(shrink) a image
+		align: scale a image (to decided width)
+		(print)
+		status: print status
+		show: show image by matplot
+		show3d: image value as height by matplot
+		iterm_show: show a image through iterm2
+		hist: show image histgram
+		(handle)
+		get: return self.img
+		end: delete self.img
 	"""
 	def __init__(self, path: str):
 		self.img = io.imread(path)
@@ -32,17 +42,17 @@ class ImageChain:
 			□□■□ => □■
 			□□□□
 		"""
-		_height = self.img.shape[0]
-		_width  = self.img.shape[1]
+		H, W = self.__get_height(), self.__get_width()
+		cH, cW = crop_size
 
 		if(pos=="center"):
-			crop_pos = (_height//2, _width//2)
+			pH, pW = self.__get_center()
 		elif(pos=="left-top" or pos=="right-top" or pos=="left-bottom" or "right-bottom"):
 			pass
 		else:
 			raise ValueError("invalid pos")
 
-		self.img = self.img[crop_pos[0]-crop_size[0]//2:crop_pos[0]+crop_size[0]//2, crop_pos[1]-crop_size[1]//2:crop_pos[1]+crop_size[1]//2]
+		self.img = self.img[pH-(cH//2):pH+(cH//2),  pW-(cW//2):pW+(cW//2)]
 		return self
 
 	def clip(self, value=(0.0, 1.0)) -> None:
@@ -51,6 +61,14 @@ class ImageChain:
 		return self
 
 	def norm(self, method="0to255->0to1") -> None:
+		"""
+		val: type:
+			0~255: uint8
+			0~65535: uint16?
+			-32768~32767: int16
+			0~1: float32/64 (normalized)
+			-1~1: float32/64 (normalized)
+		"""
 		if(method=="0to255->0to1"):
 			self.img = self.img.astype(np.float32)/255.0
 		elif(method=="0to255->-1to1"):
@@ -62,16 +80,27 @@ class ImageChain:
 		return self
 
 	def scale(self, ratio: int) -> None:
-		shape_y, shape_x = self.img.shape[0], self.img.shape[1]
-		_shape_y, _shape_x = shape_y//ratio, shape_x//ratio
-		self.img = resize(image=self.img, output_shape=[shape_y, shape_x])
+		self.img = resize(image=self.img, output_shape=[self.__get_height()//ratio, self.__get_width()//ratio])
 		return self
 
 	def align(self, width: int) -> None:
-		shape_y, shape_x = self.img.shape[0], self.img.shape[1]
-		ratio = shape_x/width # float
-		_shape_y, _shape_x = shape_y//ratio, shape_x//ratio
-		self.img = resize(image=self.img, output_shape=[shape_y, shape_x])
+		return self.scale(ratio=W/width)
+
+	def status(self) -> None:
+		print("<<Image Statistics>>")
+		img = self.img
+		print(f"max\t| {np.max(img):.4f}")
+		print(f"min\t| {np.min(img):.4f}")
+		print(f"mean\t| {np.mean(img):.4f}")
+		print(f"std\t| {np.std(img):.4f}")
+		print(f"median\t| {np.std(img):.4f}")
+		print("---")
+		print(f"<<pixel information>>")
+		print(f"shape\t| {img.shape}")
+		print(f"num_pixels\t| {self.__get_height()*self.__get_width()}")
+		print(f"dtype\t| {type(img)}")
+		print(f"dtype (one-pixel)\t| {type(img.flatten()[0])}")
+
 		return self
 
 	def show(self) -> None:
@@ -84,6 +113,18 @@ class ImageChain:
 		plt.close()
 		return self
 
+	def show3d(self) -> None:
+		H, W = np.meshgrid(
+			  np.linspace(start=0, stop=self.__get_height(), num=self.__get_height())
+			, np.linspace(start=0, stop=self.__get_width(), num=self.__get_width())
+			)
+
+		ax = plt.axes(projection='3d')
+		ax.plot_surface(x, y, z, rstride=1, cstride=1,
+						cmap='viridis', edgecolor='none')
+		ax.set_title('3D Plotting')
+		return self
+
 	def iterm_show(self):
 		im = skimage.data.chelsea()   # [300, 451, 3] ndarray, dtype=uint8
 		imgcat(self.img, height=7)
@@ -91,12 +132,25 @@ class ImageChain:
 
 	def hist(self) -> None:
 		plt.figure()
-		plt.hist(self.img, bins=20)
+		plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
 		plt.show()
 		return self
 
 	def get(self) -> "image":
 		return self.img
 
+	def end(self):
+		del self.img
+		return None
+
+	def __get_width(self) -> int:
+		return self.img.shape[1]
+
+	def __get_height(self) -> int:
+		return self.img.shape[0]
+
+	def __get_center(self) -> "tuple(height, width)":
+		return (self.__get_height(), self.__get_width())
+
 if(__name__ == "__main__"):
-	img = ImageChain(path="./src/fff.png").iterm_show().get()
+	img = ImageChain(path="./src/fff.png").iterm_show().status().hist().end()
