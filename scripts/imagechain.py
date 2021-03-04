@@ -11,9 +11,9 @@ from imgcat import imgcat
 
 # ---
 
-from type_conversion import int16_to_uint8, uint8_to_norm, norm_to_uint8
+from scripts.type_conversion import int16_to_uint8, uint8_to_norm, norm_to_uint8
 
-#import matplotlib
+#import matplotlib 
 #matplotlib.use('agg')
 
 class ImageChain:
@@ -162,7 +162,3 @@ class ImageChain:
 
 	def __get_center(self) -> "tuple(height, width)":
 		return (self.__get_height(), self.__get_width())
-
-if(__name__ == "__main__"):
-	img = ImageChain().load(path="./src/fff.png").iterm_show().status().get()
-	img = ImageChain().set_img(img).scale(ratio=8).status().show().get()
