@@ -56,9 +56,15 @@ class ImageChain:
 	"""
 	def __init__(self):
 		self.img = None
+		self.fname = "unknown.unknown"
 
 	def load(self, path: str):
 		self.img = io.imread(path)
+		self.fname = path.split("/")[-1]
+		return self
+
+	def show_fname(self):
+		pritnt(f"filename: {self.fname}")
 		return self
 
 	def set_img(self, img):
