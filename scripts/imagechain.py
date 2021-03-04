@@ -63,8 +63,9 @@ class ImageChain:
 		self.fname = path.split("/")[-1]
 		return self
 
-	def show_fname(self):
-		pritnt(f"filename: {self.fname}")
+	def show_fname(self, endl=None):
+		print(f"filename: {self.fname}")
+		if(endl!=None): print(endl)
 		return self
 
 	def set_img(self, img):
@@ -108,20 +109,27 @@ class ImageChain:
 	def align(self, width: int) -> "self":
 		return self.scale(ratio=W/width)
 
-	def status(self) -> "self":
-		print("<<Image Statistics>>")
+	def status(self, tabs=1, endl=None) -> "self":
+		_tabs = "\t"*tabs
 		img = self.img
-		print(f"max\t| {np.max(img):.4f}")
-		print(f"min\t| {np.min(img):.4f}")
-		print(f"mean\t| {np.mean(img):.4f}")
-		print(f"std\t| {np.std(img):.4f}")
-		print(f"median\t| {np.std(img):.4f}")
-		print("---")
+		_dtype_full = f'{type(img)}'
+		_dtype_1px = f'{type(img.flatten()[0])}'
+
+		print("<<Image Statistics>>")
+		# :と<の間にスペース無いとバグる。<と数字の間にスペースが有ると比較演算になってバグる
+		print(f"{'max': <15} {_tabs}| {np.max(img):.4f}")
+		print(f"{'min': <15} {_tabs}| {np.min(img):.4f}")
+		print(f"{'mean': <15} {_tabs}| {np.mean(img):.4f}")
+		print(f"{'std': <15} {_tabs}| {np.std(img):.4f}")
+		print(f"{'median': <15} {_tabs}| {np.std(img):.4f}")	
+		print("---\n")
 		print(f"<<pixel information>>")
-		print(f"shape\t| {img.shape}")
-		print(f"num_pixels\t| {self.__get_height()*self.__get_width()}")
-		print(f"dtype\t| {type(img)}")
-		print(f"dtype (one-pixel)\t| {type(img.flatten()[0])}")
+		print(f"{'shape': <15} {_tabs}| {f'{img.shape}': >25}")
+		print(f"{'num_pixels': <15} {_tabs}| {str(self.__get_height()*self.__get_width()): >25}")
+		print(f"{'dtype': <15} {_tabs}| {_dtype_full: >25}")
+		print(f"{'dtype (1px)': <15} {_tabs}| {_dtype_1px: >25}")
+
+		if(endl!=None): print(endl)
 		return self
 
 	def show(self) -> "self":
