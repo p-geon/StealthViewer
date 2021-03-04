@@ -1,3 +1,4 @@
+"""
 import numpy as np
 
 def int16_to_uint8(img):
@@ -13,3 +14,4 @@ def uint8_to_norm(img):
 def norm_to_uint8(img):
     """range: 0.0f-1.0f -> 0-255"""
     return (img*255).astype(np.int)
+"""
