@@ -159,7 +159,7 @@ class ImageChain:
 		return self
 
 	def mul(self, val: float) -> "self":
-		self.img *= mul
+		self.img *= val
 		return self
 
 	def get(self) -> "image":
