@@ -9,7 +9,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='imagechain',
-    packages=['imagechain'],
+    packages=['scripts'],
     version='0.1',
     license='MIT',
     install_requires=[],
