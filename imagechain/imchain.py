@@ -1,3 +1,4 @@
+import os
 import sys
 #from easydict import EasyDict
 import numpy as np
@@ -135,8 +136,8 @@ class ImageChain:
 		print(f"spent mem: {_mem}[byte]")
 		return self
 
-	def show(self, height=4) -> "self":
-		if(self.disp == "plt"):
+	def show(self, img_height=4) -> "self":
+		if(self.disp=="plt"):
 			del height
 			plt.figure()
 			if(len(self.img.shape)==3):
@@ -146,15 +147,11 @@ class ImageChain:
 			plt.show()
 			plt.close()
 			return self
-		elif(self.disp == "iterm"):
-			# あくまでもターミナルの表示サイズになる
-			if("float" in f"{self.__get_dtype_1px()}"):
-				_img = float_to_uint8(self.img)
-			else:
-				_img = self.img
-			imgcat(_img, height=height)
-			return self
-
+		elif(self.disp=="iterm"):
+			self.__show_with_iterm(self.img, type_img=f"{self.__get_dtype_1px()}", img_height=img_height)
+		else:
+			raise ValueError("self.disp is invalid. choice in plt/iterm")
+		
 	def show3d(self) -> "self":
 		H, W = np.meshgrid(
 			  np.linspace(start=0, stop=self.__get_height(), num=self.__get_height())
@@ -168,12 +165,24 @@ class ImageChain:
 		return self
 
 	def hist(self, dtype="int16") -> "self":
-		plt.figure()
-		if(dtype=="int16"):
-			plt.hist(img_as_ubyte(self.img.flatten()), bins=np.arange(65536+1))
-		else:
+		if(self.disp=="plt"):
+			plt.figure()
+			if(dtype=="int16"):
+				plt.hist(img_as_ubyte(self.img.flatten()), bins=np.arange(65536+1))
+			else:
+				plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
+			plt.show()
+		elif(self.disp=="iterm"):
+			tmp_path = "tmp.png"
+			plt.figure()
 			plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
-		plt.show()
+			plt.savefig(tmp_path)
+			plt.close()
+
+			img_hist = io.imread(tmp_path)
+			img_hist = img_hist[:, :, 0:3] # RGBa->RGB
+			self.__show_with_iterm(img_hist, type_img="uint8", img_height=20)
+			os.remove(tmp_path)
 		return self
 
 	def add(self, val: float) -> "self":
@@ -185,6 +194,7 @@ class ImageChain:
 		return self
 
 	def save(self, path="untitled.png") -> "self":
+		"""save via skimage.io"""
 		io.imsave(path, self.img)
 		print(f"saved {path}")
 		return self
@@ -193,3 +203,16 @@ class ImageChain:
 		"""delete image object."""
 		del self.img
 		return None
+
+	@staticmethod
+	def __show_with_iterm(img, type_img, img_height):
+		"""
+		あくまでもターミナルの表示サイズになる
+		RGBaは表示不可
+		"""
+		if("float" in type_img):
+			_img = float_to_uint8(img)
+		else:
+			_img = img
+		imgcat(_img, height=img_height)
+		return

@@ -30,6 +30,7 @@ class TestIMGChain(unittest.TestCase):
 		imc = ImageChain().load(self.path_img).show()
 		imc = imc.mul(val=-1.0).add(val=1.0).status().show()
 
+	@unittest.skip
 	def test_transform(self):
 		getimg = lambda: ImageChain(disp="iterm").load(self.path_img)
 		getimg().half().half().quarter().show()
@@ -39,6 +40,17 @@ class TestIMGChain(unittest.TestCase):
 		for pos in ["center", "top/left", "top/right", "bottom/left", "bottom/right", "unknown"]:
 			print("pos:", pos)
 			getimg().crop((256, 256), pos=pos).show()
+	
+	@unittest.skip
+	def test_save(self):
+		getimg = lambda: ImageChain(disp="iterm").load(self.path_img)
+		path = "./output/untitled.png"
+
+		getimg().crop((256, 256)).show().save(path)
+		ImageChain(disp="iterm").load(path)
+
+	def test_hist(self):
+		getimg = lambda: ImageChain(disp="iterm").load(self.path_img)
 
 	"""
 	@unittest.skip
