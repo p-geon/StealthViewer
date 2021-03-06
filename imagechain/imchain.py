@@ -1,4 +1,5 @@
 import sys
+#from easydict import EasyDict
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import ImageStat, Image
@@ -7,6 +8,7 @@ from skimage import io
 from skimage.transform import resize
 from skimage import exposure, img_as_ubyte
 from imgcat import imgcat
+
 
 int16_to_uint16 = lambda img: (img + 65536//2) # [-32,768-32,767] -> [0-65,535]
 int16_to_uint8 = lambda img: (int16_to_uint16(img)/255).astype(np.uint8) # [-32,768-32,767] -> [0-255]
@@ -17,15 +19,16 @@ norm_zscore = lambda img: (img-np.mean(img))/np.std(img)
 
 # chain
 class ImageChain:
-	def __init__(self):
+	def __init__(self, disp=["plt", "iterm"][1]):
 		"""ImageChain core"""
-		self.img = None
+		self.img = None	
 		self.fname = "unknown.unknown"
+		self.get_img = lambda: self.img
+		self.disp = disp
 
 		self.__get_height = lambda: self.img.shape[0]
 		self.__get_width = lambda: self.img.shape[1]
 		self.__get_dtype_1px = lambda: type(self.img.flatten()[0])
-		self.get_img = lambda: self.img
 
 	def load(self, path: str):
 		"""ImageChain <- load(path)"""
@@ -45,7 +48,7 @@ class ImageChain:
 		if(endl!=None): print(endl)
 		return self
 
-	def crop(self, crop_size: "(height, width)", pos=["center", "top/left", "top/right", "bottom/left", "bottom/right"][0]) -> None:
+	def crop(self, crop_size: "(height, width)", pos=['center', 'top/left', 'top/right', 'bottom/left', 'bottom/right'][0]) -> None:
 		"""img -> crop(img)"""
 		H, W = self.__get_height(), self.__get_width()
 
@@ -55,7 +58,7 @@ class ImageChain:
 		calc_bottom = lambda crop_size, height: height-crop_size[0]//2
 		calc_left = lambda crop_size: crop_size[1]//2
 		calc_right = lambda crop_size, width: width-crop_size[1]//2
-		cropping = lambda img, center, crop_size: img[center[0]-(crop_size[0]//2):center[0]+(crop_size[0]//2),  center[1]-(crop_size[1]//2):center[1]+(crop_size[1]//2)]
+		cropping = lambda img, crop_size, center: img[center[0]-(crop_size[0]//2):center[0]+(crop_size[0]//2),  center[1]-(crop_size[1]//2):center[1]+(crop_size[1]//2)]
 
 		# get center position
 		if(pos=="center"):
@@ -66,20 +69,37 @@ class ImageChain:
 			cH, cW = calc_top(crop_size), calc_right(crop_size, W)
 		elif(pos=="bottom/left"):
 			cH, cW = calc_bottom(crop_size, H), calc_left(crop_size)
-		elif("bottom/right"):
+		elif(pos=="bottom/right"):
 			cH, cW = calc_bottom(crop_size, H), calc_right(crop_size, W)
 		else:
-			raise ValueError("invalid pos. choice in [center, left-top, right-top, left-bottom, right-bottom]")
-		
+			raise ValueError("invalid pos. choice in ['center', 'top/left', 'top/right', 'bottom/left', 'bottom/right']")
+		print(cH, cW, crop_size)
 		# crop
-		_center = (cH, cW)
-		self.img = cropping(self.img, _center, crop_size)
+		self.img = cropping(self.img, crop_size, (cH, cW))
 		return self
 
 	def clip(self, value=(0.0, 1.0)) -> "self":
 		a_min, a_max = value
 		np.clip(self.img, a_min=0.0, a_max=1.0)
 		return self
+
+	def scale(self, ratio: float) -> "self":
+		self.img = resize(image=self.img
+			, output_shape=[int(self.__get_height()*ratio), int(self.__get_width()*ratio)])
+		return self
+
+	def half(self) -> "self":
+		"""checked"""
+		self.scale(ratio=0.5)
+		return self
+
+	def quarter(self) -> "self":
+		"""checked"""
+		self.scale(ratio=0.25)
+		return self
+
+	def align(self, width: int) -> "self":
+		return self.scale(ratio=width/self.__get_width())
 
 	def astype(self, method) -> "self":
 		if(method=="int16_to_uint8"):
@@ -91,13 +111,6 @@ class ImageChain:
 		else:
 			raise ValueError("invalid method")
 		return self
-
-	def scale(self, ratio: int) -> "self":
-		self.img = resize(image=self.img, output_shape=[self.__get_height()//ratio, self.__get_width()//ratio])
-		return self
-
-	def align(self, width: int) -> "self":
-		return self.scale(ratio=W/width)
 
 	def status(self, tabs=1) -> "self":
 		_tabs = "\t"*tabs
@@ -122,8 +135,9 @@ class ImageChain:
 		print(f"spent mem: {_mem}[byte]")
 		return self
 
-	def show(self, engine=["mpl", "iterm"]) -> "self":
-		if(engine == "mpl"):
+	def show(self, height=4) -> "self":
+		if(self.disp == "plt"):
+			del height
 			plt.figure()
 			if(len(self.img.shape)==3):
 				plt.imshow(self.img)
@@ -132,12 +146,13 @@ class ImageChain:
 			plt.show()
 			plt.close()
 			return self
-		elif(engine == "iterm"):
+		elif(self.disp == "iterm"):
+			# あくまでもターミナルの表示サイズになる
 			if("float" in f"{self.__get_dtype_1px()}"):
 				_img = float_to_uint8(self.img)
 			else:
 				_img = self.img
-			imgcat(_img, height=7)
+			imgcat(_img, height=height)
 			return self
 
 	def show3d(self) -> "self":
@@ -167,6 +182,11 @@ class ImageChain:
 
 	def mul(self, val: float) -> "self":
 		self.img *= val
+		return self
+
+	def save(self, path="untitled.png") -> "self":
+		io.imsave(path, self.img)
+		print(f"saved {path}")
 		return self
 
 	def end(self) -> None:
