@@ -116,6 +116,7 @@ class TestIMGChain(unittest.TestCase):
 	def test_timer(self):
 		imc = ImageChain(disp="iterm").timer().load("./src/img-CC0/pexels-snapwire-6992.jpg").timer().show()
 
+	@unittest.skip
 	def test_fft(self):
 		path = "./src/img-CC0/pexels-snapwire-6992.jpg"
 		imc = ImageChain(disp="iterm").load(path).crop((256, 256)).color2gray().show().status().hr(
@@ -123,6 +124,11 @@ class TestIMGChain(unittest.TestCase):
 		  ).show().pop().timer().ifft().timer().lmd(lambda x:x.real).status().hr(
 		  ).show()
 	
+	@unittest.skip
+	def test_font(self):
+		path = "./src/img-CC0/pexels-snapwire-6992.jpg"
+		imc = ImageChain(disp="iterm").load(path).crop((256, 256)).scale(ratio=(1, 1)).astype("float_to_uint8").status().show_with_type().hr()
+		imc = imc.show().hr().hist().hr().show3d()
 	"""
 	@unittest.skip
 	def test_iterm_show(self):

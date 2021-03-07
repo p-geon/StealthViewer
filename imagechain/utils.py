@@ -1,4 +1,5 @@
 
+"""
 def decorate_message(func):
 	def wrapper(*args, **kwargs):
 
@@ -9,7 +10,7 @@ def decorate_message(func):
 		print(" "+"="*30)
 		print(" ")
 	return wrapper
-
+"""
 def define_crop(crop_size, H, W, pos):
 	# lambdas
 	calc_pos_center = lambda height, width: (height//2, width//2)

@@ -16,7 +16,7 @@ from skimage.util.dtype import img_as_float
 #from scipy.fftpack import fft, ifft
 
 from imagechain.type_conversion import tc
-from imagechain.utils import define_crop, decorate_message
+from imagechain.utils import define_crop #, decorate_message
 
 # chain
 class ImageChain:
@@ -41,17 +41,13 @@ class ImageChain:
 		self.disp = disp
 		self.img_hist = [] # list of img
 		self.time = None
+		self.__tmp_path = "tmp.png"
 
 		# method
 		self.get_img = lambda: self.img
 		self.__get_height = lambda: self.img.shape[0]
 		self.__get_width = lambda: self.img.shape[1]
-		self.__get_dtype_1px = lambda: f"{type(self.img.flatten()[0])}"
-	
-		# aliases (for description as shorten)
-		self.status = lambda: self.log("status")
-		self.fname = lambda: self.log("fname")
-		self.memory = lambda: self.log("memory")
+		self.__get_dtype_1px = lambda: f"{type(self.img.flatten()[0])}".split("'")[1]
 
 	def set_img(self, img):
 		"""ImageChain <- Image"""
@@ -170,6 +166,18 @@ class ImageChain:
 		self.img = np.fft.ifft2(np.fft.fftshift(self.img))
 		return self
 
+	def __invert__(self) -> "self":
+		_type = self.__get_dtype_1px()
+
+		if("float" in _type):  # float32/64
+			self.img = 1 - self.img
+			return self
+		elif("uint8" in _type):
+			self.img = 255 - self.img
+			return self
+		else:
+			raise ValueError("use float or uint8")
+			
 	"""
 	<visualize>
 	- show
@@ -190,7 +198,7 @@ class ImageChain:
 			self.__show_with_iterm(self.img, type_img=f"{self.__get_dtype_1px()}", img_height=img_height)
 			return self
 		else:
-			raise ValueError("self.disp is invalid. choice in plt/iterm")
+			self.__error_disp_invalid()
 		
 	def show3d(self) -> "self":
 		H, W = np.meshgrid(
@@ -198,10 +206,21 @@ class ImageChain:
 			, np.linspace(start=0, stop=self.__get_width(), num=self.__get_width())
 			)
 
-		ax = plt.axes(projection='3d')
-		ax.plot_surface(H, W, self.img, rstride=1, cstride=1,
-						cmap='viridis', edgecolor='none')
-		ax.set_title('3D Plotting')
+		if(self.disp=="plt"):
+			"""TBD"""
+			pass
+		elif(self.disp=="iterm"):
+			fig = plt.figure()
+			ax = fig.add_subplot(1, 1, 1)
+			ax = plt.axes(projection='3d')
+			ax.plot_surface(H, W, np.mean(self.img, axis=2), rstride=1, cstride=1,
+				cmap='viridis', edgecolor='none')
+			ax.set_title('3D Plotting')
+			plt.savefig(self.__tmp_path)
+
+			self._read_and_remove_tmpfile()
+		else:
+			self.__error_disp_invalid()
 		return self
 
 	def hist(self, dtype="int16") -> "self":
@@ -213,27 +232,40 @@ class ImageChain:
 				plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
 			plt.show()
 		elif(self.disp=="iterm"):
-			tmp_path = "tmp.png"
 			plt.figure()
 			plt.hist(img_as_ubyte(exposure.rescale_intensity(self.img)).flatten(), bins=np.arange(256+1))
-			plt.savefig(tmp_path)
+			plt.savefig(self.__tmp_path)
 			plt.close()
-
-			img_hist = io.imread(tmp_path)
-			img_hist = img_hist[:, :, 0:3] # RGBa->RGB
-			self.__show_with_iterm(img_hist, type_img="uint8", img_height=20)
-			os.remove(tmp_path)
+			self._read_and_remove_tmpfile()
+		else:
+			self.__error_disp_invalid()
 		return self
 
+	def _read_and_remove_tmpfile(self) -> None:
+		_img = io.imread(self.__tmp_path)
+		_img = _img[:, :, 0:3] # RGBa->RGB
+		self.__show_with_iterm(_img, type_img="uint8", img_height=16)
+		os.remove(self.__tmp_path)
+		return None
+
 	def show_with_type(self) -> "self":
+
 		_type = self.__get_dtype_1px()
+		_height = self.__get_height()
 
-		img  = PIL.Image.fromarray(self.img)
-		draw = PIL.ImageDraw.Draw(img)
-		font = ImageFont.truetype("src/fonts-CC0/Route159-Regular.otf", 20)
-		draw.text((20, 20), _type, font=font)
+		_font_size = _height//10
+		_rect_range = (2, 2, 2+int(_font_size*7), 2+int(_font_size*1.6))
+		_pos_text = (8, 4) # offset: (left, top)
+		_font = ImageFont.truetype("src/fonts-CC0/Route159-Regular.otf", _font_size)
 
-		self.__show_with_iterm(self.img, type_img=_type)
+		img_pil  = PIL.Image.fromarray(self.img)
+		pil_draw = PIL.ImageDraw.Draw(img_pil)
+		# 順序がおかしいので注意: (x1, y1, x2, y2)
+		pil_draw.rectangle(_rect_range, fill=(0, 0, 0), outline=(255, 255, 255))
+		pil_draw.text(_pos_text, _type, font=_font)
+		img = np.array(img_pil)
+
+		self.__show_with_iterm(img, type_img=_type)
 		return self
 
 	@staticmethod
@@ -248,52 +280,35 @@ class ImageChain:
 			_img = img
 
 		if(img_height==None):
-			img_height = int(0.015*img.shape[0])+1
+			img_height = int(0.030*img.shape[0])+1
 		imgcat(_img, height=img_height)
 		return None
 
+	@staticmethod
+	def __error_disp_invalid() -> "raise":
+		raise ValueError("self.disp is invalid. choice in plt/iterm")
+
+
 	"""
 	<log>
-	- log
-	- __log_fname
-	- __log_status
-	- __log_memory
+	- status
+	- typrint
+	- hr
 	"""
-	def log(self, method=None) -> "self":
-		if(method==None):
-			pass
-		elif(method=="fname"):
-			self.__log_fname()
-		elif(method=="status"):
-			self.__log_status()
-		elif(method=="memory"):
-			self.__log_memory()
-		return self
-
-	def hr(self, n=30) -> "self":
-		print("-"*n)
-		return self
-
-	def typrint(self) -> "self":
-		_type = f"{self.__get_dtype_1px()}".split("'")[1]
-		print(f'> type: {_type}')
-		return self
-
-	@decorate_message
-	def __log_fname(self) -> "self":
-		"""show original filename (not dir)"""
-		print(f"| filename: {self.fname}")
-		return self
-	
-	@decorate_message
-	def __log_status(self) -> "self":
+	def status(self) -> "self":
 		_tabs = "\t"
 		img = self.img
-		ext = lambda _str: _str.split("'")[1]
-		_dtype_full = ext(f'{type(img)}')
-		_dtype_1px = ext(f'{self.__get_dtype_1px()}')
+		_dtype_full = f'{type(img)}'
+		_dtype_1px = self.__get_dtype_1px()
+		_mem = sys.getsizeof(self.img)/(1024**2)
+		_frame = inspect.currentframe().f_back
 
-		print("|  [Image Statistics]")
+		print(" "+"="*30)
+		print(f"| <<<Status>>>")
+		print(f"|" + "-"*30)
+		print(f"| original filename: {self.fname}")
+		print(f"|")
+		print(f"|  [Image Statistics]")
 		# :と<の間にスペース無いとバグる。<と数字の間にスペースが有ると比較演算になってバグる
 		print(f"|    max:    {np.max(img):.3f} / min: {np.min(img):.3f}")
 		print(f"|    mean:   {np.mean(img):.3f} (std: {np.std(img):.3f})")
@@ -302,25 +317,30 @@ class ImageChain:
 		print(f"|  [pixel information]")
 		print(f"|    shape: {f'{img.shape}'}")
 		print(f"|    num_pixels: {self.__get_height()*self.__get_width():,}[px]")
-		print(f"|    dtype: image:")
+		print(f"|    dtype(image)")
 		print(f"|      {_dtype_full}")
-		print(f"|    px:")
+		print(f"|    dtype(pixel)")
 		print(f"|      {_dtype_1px}")
-		return self
-	
-	@decorate_message
-	def __log_memory(self) -> "self":
-		_mem = sys.getsizeof(self.img)/(1024**2)
-		print(f"| id: {id(self.img)}")
-		print(f"| spent mem: {_mem:.3f}[MB]")
+		print(f"|")
+		print(f"|  [performance]")
+		print(f"|    spent mem: {_mem:.3f}[MB]")
+		print(f"|    id: {id(self.img)}")
+		print(f"|")
+		print(f"|  [code position]")
+		print(f"|    script: {os.path.basename(_frame.f_code.co_filename)}")
+		print(f"|    func: {_frame.f_code.co_name}")
+		print(f"|    line: {_frame.f_lineno}")
+		print(" "+"="*30)
+		print(" ")
 		return self
 
-	def where(self, depth=0) -> "self":
-		frame = inspect.currentframe().f_back
-		print(f"where:")
-		print(f"  script: {os.path.basename(frame.f_code.co_filename)}")
-		print(f"  func: {frame.f_code.co_name}")
-		print(f"  line: {frame.f_lineno}")
+	def typrint(self) -> "self":
+		_type = f"{self.__get_dtype_1px()}".split("'")[1]
+		print(f'> type: {_type}')
+		return self
+
+	def hr(self, n=30) -> "self":
+		print("-"*n)
 		return self
 
 	"""
