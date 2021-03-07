@@ -52,6 +52,8 @@ class TestIMGChain(unittest.TestCase):
 	def test_hist(self):
 		getimg = lambda: ImageChain(disp="iterm").load(self.path_img)
 
+		getimg().hist()
+
 	"""
 	@unittest.skip
 	def test_iterm_show(self):

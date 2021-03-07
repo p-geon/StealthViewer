@@ -17,9 +17,11 @@ b: ## build docker.
 r: ## run docker.
 	docker run -it --rm \
 	-v $(PWD):/work \
-	$(NAME_CONTAINER)
-c: ## connect newest container
-	docker exec -i -t $(CONTAINER_ID) /bin/bash
+	$(NAME_CONTAINER) main.py
+test: ## run test
+	docker run -it --rm \
+	-v $(PWD):/work \
+	 $(NAME_CONTAINER) test.py
 # --------------------------------------------------------
 # docker commands
 export NONE_DOCKER_IMAGES=`docker images -f dangling=true -q`

@@ -25,4 +25,5 @@ RUN pip install lycon
 
 WORKDIR ${WORKDIR}
 #ENTRYPOINT ["/bin/bash"]
-ENTRYPOINT ["python3", "./test.py"]
+#ENTRYPOINT ["python3", "./test.py"]
+ENTRYPOINT ["python3"]
