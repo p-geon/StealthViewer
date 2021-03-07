@@ -2,6 +2,7 @@ import os
 import sys
 import pdb
 import time
+import copy
 import inspect
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ from skimage.util.dtype import img_as_float
 
 from imagechain.type_conversion import tc
 from imagechain.utils import define_crop #, decorate_message
+#from imagechain import ImageOperator
 
 # chain
 class ImageChain:
@@ -48,6 +50,9 @@ class ImageChain:
 		self.__get_height = lambda: self.img.shape[0]
 		self.__get_width = lambda: self.img.shape[1]
 		self.__get_dtype_1px = lambda: f"{type(self.img.flatten()[0])}".split("'")[1]
+
+		# aliases
+		self.copy = self.uc = self.unchain
 
 	def set_img(self, img):
 		"""ImageChain <- Image"""
@@ -135,6 +140,21 @@ class ImageChain:
 		self.scale(ratio=size)
 		return self
 
+	# flip-family
+	def flip_h(self) -> "self":
+		self.img = self.img[:, ::-1]
+		return self
+	def flip(self)-> "self":
+		return self.flip_h()
+	def flip_v(self) -> "self":
+		self.img = self.img[::-1]
+		return self
+	def flip_vh(self) -> "self":
+		self.img = self.img[::-1, ::-1]
+		return self
+	def flip_hv(self) -> "self":
+		return self.flip_vh()
+
 	"""
 	<operators>
 	- add
@@ -177,7 +197,7 @@ class ImageChain:
 			return self
 		else:
 			raise ValueError("use float or uint8")
-			
+
 	"""
 	<visualize>
 	- show
@@ -376,7 +396,7 @@ class ImageChain:
 	"""
 	
 	def __call__(self) -> "image":
-		return self.img
+		return self.get_img()
 
 	def __getitem__(self, val: slice) -> "self":
 		print(val)
@@ -386,3 +406,59 @@ class ImageChain:
 		W1, W2, W3 = W.start, W.stop, W.step
 		self.img = self.img[H1:H2:H3, W1:W2:W3]#, C1:C2]
 		return self
+	
+	def get_img(self):
+		return self.img
+
+	def get_operator(self):
+		return ImageOperator(self.img)
+
+	def shape(self):
+		print(self.img.shape)
+		return self
+
+	def unchain(self):
+		return copy.deepcopy(self)
+
+	"""
+	illegal operators
+	"""
+	def __add__(self, other):
+		"""
+		A+B
+		■□
+		"""
+		self.img = np.concatenate([self.img, other.img], axis=1)
+		return self
+
+	def __or__(self, other):
+		"""|"""
+		return self.__add__(other)
+
+
+	def __truediv__(self, other):
+		"""
+		A/B
+		■
+		□
+		"""
+		self.img = np.concatenate([self.img, other.img], axis=0)
+		return self
+
+	def __eq__(self, other):
+		"""=="""
+		return self.__truediv__(other)
+	
+	def __floordiv__(self, other):
+		_separator = np.zeros_like(self.img)[0:5, :]
+		self.img = np.concatenate([self.img, _separator, other.img], axis=0)
+		return self
+
+	def __mul__(self, other):
+		pass
+
+	def __sub__(self, other):
+		pass
+
+	def __pos__(self):
+		return self.unchain()

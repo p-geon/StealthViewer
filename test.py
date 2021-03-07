@@ -10,6 +10,7 @@ from imagechain import Chains
 from imagechain import imflow as imf
 
 from imagechain import ii
+#from imagechain import ImageOperator
 
 print(f"python: {sys.version}")
 
@@ -129,6 +130,22 @@ class TestIMGChain(unittest.TestCase):
 		path = "./src/img-CC0/pexels-snapwire-6992.jpg"
 		imc = ImageChain(disp="iterm").load(path).crop((256, 256)).scale(ratio=(1, 1)).astype("float_to_uint8").status().show_with_type().hr()
 		imc = imc.show().hr().hist().hr().show3d()
+
+	def test_operator(self):
+		path = "./src/img-CC0/pexels-snapwire-6992.jpg"
+		imc = ImageChain(disp="iterm").load(path).crop((256, 256)).show()
+		#imc2 = ImageChain(disp="iterm").load(path).crop((256, 256)).lmd(lambda x: x[:, ::-1]).show()
+		#imc3 = ImageChain(disp="iterm").load(path).crop((256, 256)).lmd(lambda x: x[::-1]).show()
+		#imc4 = ImageChain(disp="iterm").load(path).crop((256, 256)).lmd(lambda x: x[::-1]).lmd(lambda x: x[:, ::-1]).show()
+
+		print("==")
+		imc12 = (+imc) | (+imc).flip_h()
+		imc34 = (+imc).flip_v() | (+imc).flip_vh()
+		imc12.shape().show().status()
+		imc34.shape().show().status()
+		imc1234 = (imc12 // imc34)
+		imc1234.show().status()
+
 	"""
 	@unittest.skip
 	def test_iterm_show(self):
