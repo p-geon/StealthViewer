@@ -1,16 +1,19 @@
 import os
 import sys
-from easydict import EasyDict
+import pdb
+import time
+import inspect
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import ImageStat, Image
+from imgcat import imgcat
+import PIL
+from PIL import ImageDraw, ImageFont
 import skimage
 from skimage import io
 from skimage.transform import resize
 from skimage import exposure, img_as_ubyte
 from skimage.util.dtype import img_as_float
-
-from imgcat import imgcat
+#from scipy.fftpack import fft, ifft
 
 from imagechain.type_conversion import tc
 from imagechain.utils import define_crop, decorate_message
@@ -19,32 +22,40 @@ from imagechain.utils import define_crop, decorate_message
 class ImageChain:
 	"""
 	基本はfloat64。明示したときのみuint8
+
+	- Core
+	- Push/Pop
+	- I/O
+	- conversion
+	- transform
+	- operators
+	- visualize
+	- log
+	- debug
+	- extra method
 	"""
 	def __init__(self, disp=["plt", "iterm"][1]):
 		"""ImageChain core"""
 		self.img = None	
 		self.fname = "unknown.unknown"
-		self.get_img = lambda: self.img
 		self.disp = disp
 		self.img_hist = [] # list of img
+		self.time = None
 
+		# method
+		self.get_img = lambda: self.img
 		self.__get_height = lambda: self.img.shape[0]
 		self.__get_width = lambda: self.img.shape[1]
-		self.__get_dtype_1px = lambda: type(self.img.flatten()[0])
+		self.__get_dtype_1px = lambda: f"{type(self.img.flatten()[0])}"
 	
+		# aliases (for description as shorten)
+		self.status = lambda: self.log("status")
+		self.fname = lambda: self.log("fname")
+		self.memory = lambda: self.log("memory")
+
 	def set_img(self, img):
 		"""ImageChain <- Image"""
 		self.img = img
-		return self
-	"""
-	<Push/Pop>
-	"""
-	def push(self):
-		self.img_hist.append(self.img)
-		return self
-
-	def pop(self):
-		self.img = self.img_hist.pop()
 		return self
 
 	"""
@@ -66,6 +77,17 @@ class ImageChain:
 		return self
 
 	"""
+	<Push/Pop>
+	"""
+	def push(self):
+		self.img_hist.append(self.img)
+		return self
+
+	def pop(self):
+		self.img = self.img_hist.pop()
+		return self
+
+	"""
 	<conversion>
 	- astype (type conversion)
 	- clip
@@ -77,6 +99,15 @@ class ImageChain:
 	def clip(self, value=(0.0, 1.0)) -> "self":
 		a_min, a_max = value
 		np.clip(self.img, a_min=0.0, a_max=1.0)
+		return self
+
+	def gray2color(self) -> "self":
+		gs = self.img
+		self.img = np.tile(self.img[np.newaxis], (1, 1, 3))
+		return self
+
+	def color2gray(self) -> "self":
+		self.img = np.mean(self.img, axis=2)
 		return self
 
 	"""
@@ -129,13 +160,23 @@ class ImageChain:
 		self.img /= val
 		return self
 
+	def fft(self) -> "self":
+		#self.img = fft(self.img)
+		self.img = np.fft.fftshift(np.fft.fft2(self.img))
+		return self
+
+	def ifft(self) -> "self":
+		#self.img = ifft(self.img)
+		self.img = np.fft.ifft2(np.fft.fftshift(self.img))
+		return self
+
 	"""
 	<visualize>
 	- show
 	- show3d
 	- hist
 	"""
-	def show(self, img_height=4) -> "self":
+	def show(self, img_height=None) -> "self":
 		if(self.disp=="plt"):
 			plt.figure()
 			if(len(self.img.shape)==3):
@@ -184,24 +225,33 @@ class ImageChain:
 			os.remove(tmp_path)
 		return self
 
+	def show_with_type(self) -> "self":
+		_type = self.__get_dtype_1px()
+
+		img  = PIL.Image.fromarray(self.img)
+		draw = PIL.ImageDraw.Draw(img)
+		font = ImageFont.truetype("src/fonts-CC0/Route159-Regular.otf", 20)
+		draw.text((20, 20), _type, font=font)
+
+		self.__show_with_iterm(self.img, type_img=_type)
+		return self
+
 	@staticmethod
-	def __show_with_iterm(img, type_img, img_height) -> None:
+	def __show_with_iterm(img, type_img, img_height=None) -> None:
 		"""
-		あくまでもターミナルの表示サイズになる
+		あくまでもターミナルの表示サイズが基準
 		RGBaは表示不可
 		"""
 		if("float" in type_img):
 			_img = tc.float_to_uint8(img)
 		else:
 			_img = img
+
+		if(img_height==None):
+			img_height = int(0.015*img.shape[0])+1
 		imgcat(_img, height=img_height)
 		return None
 
-	def end(self) -> None:
-		"""delete image object."""
-		del self.img
-		return None
-	
 	"""
 	<log>
 	- log
@@ -220,6 +270,10 @@ class ImageChain:
 			self.__log_memory()
 		return self
 
+	def hr(self, n=30) -> "self":
+		print("-"*n)
+		return self
+
 	def typrint(self) -> "self":
 		_type = f"{self.__get_dtype_1px()}".split("'")[1]
 		print(f'> type: {_type}')
@@ -235,8 +289,9 @@ class ImageChain:
 	def __log_status(self) -> "self":
 		_tabs = "\t"
 		img = self.img
-		_dtype_full = f'{type(img)}'
-		_dtype_1px = f'{self.__get_dtype_1px()}'
+		ext = lambda _str: _str.split("'")[1]
+		_dtype_full = ext(f'{type(img)}')
+		_dtype_1px = ext(f'{self.__get_dtype_1px()}')
 
 		print("|  [Image Statistics]")
 		# :と<の間にスペース無いとバグる。<と数字の間にスペースが有ると比較演算になってバグる
@@ -245,7 +300,8 @@ class ImageChain:
 		print(f"|    median: {np.median(img):.3f}")
 		print(f"|")
 		print(f"|  [pixel information]")
-		print(f"|    shape: {f'{img.shape}'}, num_pixels: {str(self.__get_height()*self.__get_width())}")
+		print(f"|    shape: {f'{img.shape}'}")
+		print(f"|    num_pixels: {self.__get_height()*self.__get_width():,}[px]")
 		print(f"|    dtype: image:")
 		print(f"|      {_dtype_full}")
 		print(f"|    px:")
@@ -257,4 +313,56 @@ class ImageChain:
 		_mem = sys.getsizeof(self.img)/(1024**2)
 		print(f"| id: {id(self.img)}")
 		print(f"| spent mem: {_mem:.3f}[MB]")
+		return self
+
+	def where(self, depth=0) -> "self":
+		frame = inspect.currentframe().f_back
+		print(f"where:")
+		print(f"  script: {os.path.basename(frame.f_code.co_filename)}")
+		print(f"  func: {frame.f_code.co_name}")
+		print(f"  line: {frame.f_lineno}")
+		return self
+
+	"""
+	<debug>
+	- pdb
+	- void (?) 不要？
+	- lmd
+	"""
+	def pdb(self) -> "self":
+		pdb.set_trace()
+		return self
+
+	def void(self, memo="you can write free memo.") -> "self":
+		return self
+
+	def lmd(self, func) -> "self": # lambda
+		self.img = func(self.img)
+		return self
+
+	def timer(self) -> "self":
+		if(self.time==None):
+			print("> initialize timer")
+		else:
+			_spent_time = time.time() - self.time
+			print(f"> spent time: {_spent_time:.5f}")
+		self.time = time.time()
+		return self
+
+	"""
+	<extra method>
+	- __call__
+	- __getitem__
+	"""
+	
+	def __call__(self) -> "image":
+		return self.img
+
+	def __getitem__(self, val: slice) -> "self":
+		print(val)
+		H = val[0]
+		W = val[1]
+		H1, H2, H3 = H.start, H.stop, H.step
+		W1, W2, W3 = W.start, W.stop, W.step
+		self.img = self.img[H1:H2:H3, W1:W2:W3]#, C1:C2]
 		return self

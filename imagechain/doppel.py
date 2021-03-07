@@ -32,6 +32,11 @@ class Doppel:
 			print(f"not same shape \nimg1: {self.imgs[0].shape}, img2: {self.imgs[1].shape}")
 			return self
 
+	def is_same(sef):
+		np.allclose()
+		"""TBD"""
+		return self
+
 	def mae(self):
 		""" diff = |img1-img2| """
 		mae = self.diff(self.imgs[0], self.imgs[1]).sum()
