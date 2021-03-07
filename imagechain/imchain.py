@@ -10,13 +10,7 @@ from skimage.transform import resize
 from skimage import exposure, img_as_ubyte
 from imgcat import imgcat
 
-
-int16_to_uint16 = lambda img: (img + 65536//2) # [-32,768-32,767] -> [0-65,535]
-int16_to_uint8 = lambda img: (int16_to_uint16(img)/255).astype(np.uint8) # [-32,768-32,767] -> [0-255]
-uint8_to_float64 = lambda img: img.astype(np.float64)/255.0 # [0-255] -> [0.0f-1.0f]
-float_to_uint8 = lambda img: (img*255).astype(np.int) # [0.0f-1.0f] -> [0-255]
-norm_minmax = lambda img: (img - np.min(img))/(np.max(img)-np.min(img)) # [min-max] -> [0.0f-1.0f]
-norm_zscore = lambda img: (img-np.mean(img))/np.std(img)
+from imagechain.type_conversion import tc
 
 # chain
 class ImageChain:
@@ -34,7 +28,7 @@ class ImageChain:
 	def load(self, path: str):
 		"""ImageChain <- load(path)"""
 		img = io.imread(path) # uint8
-		self.img = uint8_to_float64(img)
+		self.img = tc.uint8_to_float64(img)
 		self.fname = path.split("/")[-1]
 		return self
 
@@ -103,14 +97,17 @@ class ImageChain:
 		return self.scale(ratio=width/self.__get_width())
 
 	def astype(self, method) -> "self":
+		self.img = tf[method](self.img)
+		"""
 		if(method=="int16_to_uint8"):
-			self.img = int16_to_uint8(self.img)
+			self.img = tc.int16_to_uint8(self.img)
 		elif(method=="uint8_to_float64"):
-			self.img = uint8_to_float64(self.img)
+			self.img = tc.uint8_to_float64(self.img)
 		elif(method=="float_to_uint8"):
-			self.img = float_to_uint8(self.img)
+			self.img = tc.float_to_uint8(self.img)
 		else:
 			raise ValueError("invalid method")
+		"""
 		return self
 
 	def status(self, tabs=1) -> "self":
@@ -211,7 +208,7 @@ class ImageChain:
 		RGBaは表示不可
 		"""
 		if("float" in type_img):
-			_img = float_to_uint8(img)
+			_img = tc.float_to_uint8(img)
 		else:
 			_img = img
 		imgcat(_img, height=img_height)
