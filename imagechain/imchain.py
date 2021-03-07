@@ -1,6 +1,6 @@
 import os
 import sys
-#from easydict import EasyDict
+from easydict import EasyDict
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import ImageStat, Image
@@ -8,69 +8,70 @@ import skimage
 from skimage import io
 from skimage.transform import resize
 from skimage import exposure, img_as_ubyte
+from skimage.util.dtype import img_as_float
+
 from imgcat import imgcat
 
 from imagechain.type_conversion import tc
+from imagechain.utils import define_crop, decorate_message
 
 # chain
 class ImageChain:
+	"""
+	基本はfloat64。明示したときのみuint8
+	"""
 	def __init__(self, disp=["plt", "iterm"][1]):
 		"""ImageChain core"""
 		self.img = None	
 		self.fname = "unknown.unknown"
 		self.get_img = lambda: self.img
 		self.disp = disp
+		self.img_hist = [] # list of img
 
 		self.__get_height = lambda: self.img.shape[0]
 		self.__get_width = lambda: self.img.shape[1]
 		self.__get_dtype_1px = lambda: type(self.img.flatten()[0])
-
-	def load(self, path: str):
-		"""ImageChain <- load(path)"""
-		img = io.imread(path) # uint8
-		self.img = tc.uint8_to_float64(img)
-		self.fname = path.split("/")[-1]
-		return self
-
+	
 	def set_img(self, img):
 		"""ImageChain <- Image"""
 		self.img = img
 		return self
-
-	def show_fname(self, endl=None):
-		"""show original filename (not dir)"""
-		print(f"filename: {self.fname}")
-		if(endl!=None): print(endl)
+	"""
+	<Push/Pop>
+	"""
+	def push(self):
+		self.img_hist.append(self.img)
 		return self
 
-	def crop(self, crop_size: "(height, width)", pos=['center', 'top/left', 'top/right', 'bottom/left', 'bottom/right'][0]) -> None:
-		"""img -> crop(img)"""
-		H, W = self.__get_height(), self.__get_width()
+	def pop(self):
+		self.img = self.img_hist.pop()
+		return self
 
-		# lambdas
-		calc_pos_center = lambda height, width: (height//2, width//2)
-		calc_top = lambda crop_size: crop_size[0]//2
-		calc_bottom = lambda crop_size, height: height-crop_size[0]//2
-		calc_left = lambda crop_size: crop_size[1]//2
-		calc_right = lambda crop_size, width: width-crop_size[1]//2
-		cropping = lambda img, crop_size, center: img[center[0]-(crop_size[0]//2):center[0]+(crop_size[0]//2),  center[1]-(crop_size[1]//2):center[1]+(crop_size[1]//2)]
+	"""
+	<I/O>
+	- save
+	"""
+	def load(self, path: str):
+		"""ImageChain <- load(path)"""
+		img = io.imread(path) # uint8
+		#self.img = tc.uint8_to_float64(img)
+		self.img = img_as_float(img)
+		self.fname = path.split("/")[-1]
+		return self
+		
+	def save(self, path="untitled.png") -> "self":
+		"""save via skimage.io"""
+		io.imsave(path, self.img)
+		print(f"saved {path}")
+		return self
 
-		# get center position
-		if(pos=="center"):
-			cH, cW = calc_pos_center(H, W)
-		elif(pos=="top/left"):
-			cH, cW = calc_top(crop_size), calc_left(crop_size)
-		elif(pos=="top/right"):
-			cH, cW = calc_top(crop_size), calc_right(crop_size, W)
-		elif(pos=="bottom/left"):
-			cH, cW = calc_bottom(crop_size, H), calc_left(crop_size)
-		elif(pos=="bottom/right"):
-			cH, cW = calc_bottom(crop_size, H), calc_right(crop_size, W)
-		else:
-			raise ValueError("invalid pos. choice in ['center', 'top/left', 'top/right', 'bottom/left', 'bottom/right']")
-		print(cH, cW, crop_size)
-		# crop
-		self.img = cropping(self.img, crop_size, (cH, cW))
+	"""
+	<conversion>
+	- astype (type conversion)
+	- clip
+	"""
+	def astype(self, method) -> "self":
+		self.img = tc[method](self.img)
 		return self
 
 	def clip(self, value=(0.0, 1.0)) -> "self":
@@ -78,64 +79,64 @@ class ImageChain:
 		np.clip(self.img, a_min=0.0, a_max=1.0)
 		return self
 
-	def scale(self, ratio: float) -> "self":
+	"""
+	<transform>
+	- crop
+	"""
+	def crop(self, crop_size: "(height, width)", pos=['center', 'top/left', 'top/right', 'bottom/left', 'bottom/right'][0]) -> None:
+		"""img -> crop(img)"""
+		self.img = define_crop(crop_size
+					, H=self.__get_height(), W=self.__get_width()
+					, pos=pos)(self.img)
+		return self
+
+	def scale(self, ratio: "shrink/expand ratio, tuple(W, H)") -> "self":
 		self.img = resize(image=self.img
-			, output_shape=[int(self.__get_height()*ratio), int(self.__get_width()*ratio)])
-		return self
-
-	def half(self) -> "self":
-		"""checked"""
-		self.scale(ratio=0.5)
-		return self
-
-	def quarter(self) -> "self":
-		"""checked"""
-		self.scale(ratio=0.25)
+			, output_shape=[int(ratio[0]*self.__get_height()), int(ratio[1]*self.__get_width())]
+			)
 		return self
 
 	def align(self, width: int) -> "self":
-		return self.scale(ratio=width/self.__get_width())
+		_r = width/self.__get_width()
+		return self.scale(ratio=(_r, _r))
 
-	def astype(self, method) -> "self":
-		self.img = tf[method](self.img)
-		"""
-		if(method=="int16_to_uint8"):
-			self.img = tc.int16_to_uint8(self.img)
-		elif(method=="uint8_to_float64"):
-			self.img = tc.uint8_to_float64(self.img)
-		elif(method=="float_to_uint8"):
-			self.img = tc.float_to_uint8(self.img)
-		else:
-			raise ValueError("invalid method")
-		"""
+	def pool(self, size=(2, 2)) -> "self":
+		self.scale(ratio=(1.0/size[0], 1.0/size[1]))
 		return self
 
-	def status(self, tabs=1) -> "self":
-		_tabs = "\t"*tabs
-		img = self.img
-		_dtype_full = f'{type(img)}'
-		_dtype_1px = f'{self.__get_dtype_1px()}'
-		print("="*30 + "\nStatus\n" + "-"*30)
-		print("  [Image Statistics]")
-		# :と<の間にスペース無いとバグる。<と数字の間にスペースが有ると比較演算になってバグる
-		print(f"    max:    {np.max(img):.3f} / min: {np.min(img):.3f}")
-		print(f"    mean:   {np.mean(img):.3f} (std: {np.std(img):.3f})")
-		print(f"    median: {np.median(img):.3f}")
-		print("")
-		print(f"  [pixel information]")
-		print(f"    shape: {f'{img.shape}'}, num_pixels: {str(self.__get_height()*self.__get_width())}")
-		print(f"    dtype: image: {_dtype_full}, px: {_dtype_1px}")
-		print("="*30)
+	def unpool(self, size=(2, 2)) -> "self":
+		self.scale(ratio=size)
 		return self
 
-	def memory(self) -> "self":
-		_mem = sys.getsizeof(self.img)
-		print(f"spent mem: {_mem}[byte]")
+	"""
+	<operators>
+	- add
+	- mul
+	"""
+	def add(self, val: float) -> "self":
+		self.img += val
 		return self
 
+	def sub(self, val: float) -> "self":
+		self.img -= val
+		return self
+
+	def mul(self, val: float) -> "self":
+		self.img *= val
+		return self
+
+	def div(self, val: float) -> "self":
+		self.img /= val
+		return self
+
+	"""
+	<visualize>
+	- show
+	- show3d
+	- hist
+	"""
 	def show(self, img_height=4) -> "self":
 		if(self.disp=="plt"):
-			del height
 			plt.figure()
 			if(len(self.img.shape)==3):
 				plt.imshow(self.img)
@@ -146,6 +147,7 @@ class ImageChain:
 			return self
 		elif(self.disp=="iterm"):
 			self.__show_with_iterm(self.img, type_img=f"{self.__get_dtype_1px()}", img_height=img_height)
+			return self
 		else:
 			raise ValueError("self.disp is invalid. choice in plt/iterm")
 		
@@ -182,27 +184,8 @@ class ImageChain:
 			os.remove(tmp_path)
 		return self
 
-	def add(self, val: float) -> "self":
-		self.img += val
-		return self
-
-	def mul(self, val: float) -> "self":
-		self.img *= val
-		return self
-
-	def save(self, path="untitled.png") -> "self":
-		"""save via skimage.io"""
-		io.imsave(path, self.img)
-		print(f"saved {path}")
-		return self
-
-	def end(self) -> None:
-		"""delete image object."""
-		del self.img
-		return None
-
 	@staticmethod
-	def __show_with_iterm(img, type_img, img_height):
+	def __show_with_iterm(img, type_img, img_height) -> None:
 		"""
 		あくまでもターミナルの表示サイズになる
 		RGBaは表示不可
@@ -212,4 +195,66 @@ class ImageChain:
 		else:
 			_img = img
 		imgcat(_img, height=img_height)
-		return
+		return None
+
+	def end(self) -> None:
+		"""delete image object."""
+		del self.img
+		return None
+	
+	"""
+	<log>
+	- log
+	- __log_fname
+	- __log_status
+	- __log_memory
+	"""
+	def log(self, method=None) -> "self":
+		if(method==None):
+			pass
+		elif(method=="fname"):
+			self.__log_fname()
+		elif(method=="status"):
+			self.__log_status()
+		elif(method=="memory"):
+			self.__log_memory()
+		return self
+
+	def typrint(self) -> "self":
+		_type = f"{self.__get_dtype_1px()}".split("'")[1]
+		print(f'> type: {_type}')
+		return self
+
+	@decorate_message
+	def __log_fname(self) -> "self":
+		"""show original filename (not dir)"""
+		print(f"| filename: {self.fname}")
+		return self
+	
+	@decorate_message
+	def __log_status(self) -> "self":
+		_tabs = "\t"
+		img = self.img
+		_dtype_full = f'{type(img)}'
+		_dtype_1px = f'{self.__get_dtype_1px()}'
+
+		print("|  [Image Statistics]")
+		# :と<の間にスペース無いとバグる。<と数字の間にスペースが有ると比較演算になってバグる
+		print(f"|    max:    {np.max(img):.3f} / min: {np.min(img):.3f}")
+		print(f"|    mean:   {np.mean(img):.3f} (std: {np.std(img):.3f})")
+		print(f"|    median: {np.median(img):.3f}")
+		print(f"|")
+		print(f"|  [pixel information]")
+		print(f"|    shape: {f'{img.shape}'}, num_pixels: {str(self.__get_height()*self.__get_width())}")
+		print(f"|    dtype: image:")
+		print(f"|      {_dtype_full}")
+		print(f"|    px:")
+		print(f"|      {_dtype_1px}")
+		return self
+	
+	@decorate_message
+	def __log_memory(self) -> "self":
+		_mem = sys.getsizeof(self.img)/(1024**2)
+		print(f"| id: {id(self.img)}")
+		print(f"| spent mem: {_mem:.3f}[MB]")
+		return self

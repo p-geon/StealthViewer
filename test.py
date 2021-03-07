@@ -5,6 +5,7 @@ import unittest
 #from scripts.imagechain import ImageChain
 from imagechain import ImageChain
 from imagechain import ImcFlow
+from imagechain import Chains
 from imagechain import imflow as imf
 
 print(f"python: {sys.version}")
@@ -30,7 +31,6 @@ class TestIMGChain(unittest.TestCase):
 		imc = ImageChain().load(self.path_img).show()
 		imc = imc.mul(val=-1.0).add(val=1.0).status().show()
 
-	@unittest.skip
 	def test_transform(self):
 		getimg = lambda: ImageChain(disp="iterm").load(self.path_img)
 		getimg().half().half().quarter().show()
@@ -49,11 +49,26 @@ class TestIMGChain(unittest.TestCase):
 		getimg().crop((256, 256)).show().save(path)
 		ImageChain(disp="iterm").load(path)
 
+	@unittest.skip
 	def test_hist(self):
 		getimg = lambda: ImageChain(disp="iterm").load(self.path_img)
-
 		getimg().hist()
 
+	@unittest.skip
+	def test_log(self):
+		_ = ImageChain(disp="iterm").load(self.path_img).show().log("fname").log("status").log("memory")
+		_ = ImageChain(disp="iterm").load(self.path_img).astype("float_to_uint8").show().log("fname").log("status").log("memory")
+
+	@unittest.skip
+	def test_transform(self):
+		imc = ImageChain(disp="iterm").load(self.path_img).show()
+		imc = imc.typrint().show().log("status").typrint()
+		imc = imc.crop((256, 256), "center").log("status")
+		imc = imc.pool().log("status").show().unpool().show().scale((0.1, 0.2)).show().align(100).show()
+
+	def test_pushpop(self):
+		imc = ImageChain(disp="iterm").load(self.path_img).show()
+		imc = imc.show().typrint().push().pool().typrint().show().pop().show()
 	"""
 	@unittest.skip
 	def test_iterm_show(self):
